@@ -6,46 +6,12 @@ use std::collections::HashMap;
 use std::thread::sleep;
 use std::time::Duration;
 
-// const GRID_WIDTH: i64 = 30;
-// const GRID_HEIGHT: i64 = 30;
-
-const GAP: u32 = 10;
+const GAP: u32 = 1;
+const OUTER_GAP: u32 = 10;
 const WINDOW_WIDTH: u32 = 960;
 const ASPECT_RATIO: f32 = 9.0 / 16.0;
 
-// Oscillator
-// grid[idx2dto1d(10, 10)] = CELL::Alive;
-// grid[idx2dto1d(11, 10)] = CELL::Alive;
-// grid[idx2dto1d(12, 10)] = CELL::Alive;
-// grid[idx2dto1d(11, 11)] = CELL::Alive;
-// grid[idx2dto1d(12, 11)] = CELL::Alive;
-// grid[idx2dto1d(13, 11)] = CELL::Alive;
-
-// Glider
-// grid[idx2dto1d(1, 1)] = CELL::Alive;
-// grid[idx2dto1d(2, 2)] = CELL::Alive;
-// grid[idx2dto1d(2, 3)] = CELL::Alive;
-// grid[idx2dto1d(1, 3)] = CELL::Alive;
-// grid[idx2dto1d(0, 3)] = CELL::Alive;
-
-// Penta-decathlon
-// grid[idx2dto1d(15, 0)] = CELL::Alive;
-// grid[idx2dto1d(15, 1)] = CELL::Alive;
-// grid[idx2dto1d(17, 0)] = CELL::Alive;
-// grid[idx2dto1d(16, 1)] = CELL::Alive;
-// grid[idx2dto1d(16, 2)] = CELL::Alive;
-
-// grid[idx2dto1d(22, 2)] = CELL::Alive;
-// grid[idx2dto1d(22, 3)] = CELL::Alive;
-// grid[idx2dto1d(22, 4)] = CELL::Alive;
-// grid[idx2dto1d(23, 4)] = CELL::Alive;
-// grid[idx2dto1d(24, 3)] = CELL::Alive;
-
-// grid[idx2dto1d(7, 15)] = CELL::Alive;
-// grid[idx2dto1d(8, 15)] = CELL::Alive;
-// grid[idx2dto1d(9, 15)] = CELL::Alive;
-// grid[idx2dto1d(9, 16)] = CELL::Alive;
-// grid[idx2dto1d(8, 17)] = CELL::Alive;
+const QUAD_SIZE: u32 = 14;
 
 #[derive(Clone, PartialEq)]
 enum CellType {
@@ -53,19 +19,8 @@ enum CellType {
 	Dead,
 }
 
-struct Cell {
-	pos: (i64, i64),
-	cell_type: CellType,
-}
-
-impl Cell {
-	fn new(pos: (i64, i64), cell_type: CellType) -> Cell {
-		Cell { pos, cell_type }
-	}
-}
-
 struct Grid {
-	grid: HashMap<(i64, i64), Cell>,
+	grid: HashMap<(i64, i64), CellType>,
 }
 
 impl Grid {
@@ -76,7 +31,7 @@ impl Grid {
 	}
 
 	pub fn add_cell(&mut self, pos: (i64, i64), typ: CellType) {
-		self.grid.insert(pos, Cell::new(pos, typ));
+		self.grid.insert(pos, typ);
 	}
 
 	fn get_neigh_count(&self, x: i64, y: i64) -> i64 {
@@ -100,6 +55,26 @@ impl Grid {
 		}
 		return alive_neigh;
 	}
+
+	fn add_penta_decathlon(&mut self, x: i64, y: i64) {
+		self.add_cell((x + 15, y + 0), CellType::Alive);
+		self.add_cell((x + 15, y + 1), CellType::Alive);
+		self.add_cell((x + 17, y + 0), CellType::Alive);
+		self.add_cell((x + 16, y + 1), CellType::Alive);
+		self.add_cell((x + 16, y + 2), CellType::Alive);
+
+		self.add_cell((x + 22, y + 2), CellType::Alive);
+		self.add_cell((x + 22, y + 3), CellType::Alive);
+		self.add_cell((x + 22, y + 4), CellType::Alive);
+		self.add_cell((x + 23, y + 4), CellType::Alive);
+		self.add_cell((x + 24, y + 3), CellType::Alive);
+
+		self.add_cell((x + 7, y + 15), CellType::Alive);
+		self.add_cell((x + 8, y + 15), CellType::Alive);
+		self.add_cell((x + 9, y + 15), CellType::Alive);
+		self.add_cell((x + 9, y + 16), CellType::Alive);
+		self.add_cell((x + 8, y + 17), CellType::Alive);
+	}
 }
 
 fn main() {
@@ -121,14 +96,10 @@ fn main() {
 	let mut event_pump = sdl_context.event_pump().unwrap();
 
 	let mut grid = Grid::new();
-	grid.add_cell((1, 1), CellType::Alive);
-	grid.add_cell((2, 2), CellType::Alive);
-	grid.add_cell((2, 3), CellType::Alive);
-	grid.add_cell((1, 3), CellType::Alive);
-	grid.add_cell((0, 3), CellType::Alive);
+	grid.add_penta_decathlon(10, 10);
 
 	'running: loop {
-		canvas.set_draw_color(Color::RGB(100, 100, 100));
+		canvas.set_draw_color(Color::RGB(150, 150, 150));
 		canvas.clear();
 		for event in event_pump.poll_iter() {
 			match event {
@@ -141,56 +112,53 @@ fn main() {
 			}
 		}
 
-		game_cyle(&mut grid, &mut canvas);
-
+		let draw_surf = canvas.viewport();
+		let vpwidth = (draw_surf.width() - OUTER_GAP) / (QUAD_SIZE + GAP);
+		let vpheight = (draw_surf.height() - OUTER_GAP) / (QUAD_SIZE + GAP);
+		game_cyle(&mut grid, &mut canvas, vpwidth, vpheight, 0, 0);
 		canvas.present();
-		sleep(Duration::from_millis(500));
+		sleep(Duration::from_millis(30));
 	}
 }
-const QUAD_WIDTH: u32 = 20;
-const QUAD_HEIGHT: u32 = 20;
 
-fn game_cyle(grid: &mut Grid, canvas: &mut Canvas<sdl2::video::Window>) {
+fn game_cyle(
+	grid: &mut Grid, canvas: &mut Canvas<sdl2::video::Window>, vpwidth: u32, vpheight: u32,
+	off_x: i64, off_y: i64,
+) {
 	let mut new_grid = Grid::new();
+	for vpy in 0..vpheight {
+		for vpx in 0..vpwidth {
+			let x: i64 = vpx as i64 + off_x;
+			let y: i64 = vpy as i64 + off_y;
 
-	for (k, v) in &grid.grid {
-		let neigh = grid.get_neigh_count(k.0, k.1);
-		match v.cell_type {
-			CellType::Alive => {
-				if neigh < 2 {
-					new_grid.add_cell(*k, CellType::Dead);
-				} else if neigh == 2 || neigh == 3 {
-					new_grid.add_cell(*k, CellType::Alive);
-				} else if neigh >= 3 {
-					new_grid.add_cell(*k, CellType::Dead);
+			let neigh = grid.get_neigh_count(x, y);
+			let v = grid.grid.get(&(x, y)).unwrap_or(&CellType::Dead);
+			match v {
+				CellType::Alive => {
+					if neigh == 2 || neigh == 3 {
+						new_grid.add_cell((x, y), CellType::Alive);
+					}
+				}
+				CellType::Dead => {
+					if neigh == 3 {
+						new_grid.add_cell((x, y), CellType::Alive);
+					}
 				}
 			}
-			CellType::Dead => {
-				if neigh == 3 {
-					new_grid.add_cell(*k, CellType::Alive);
-				}
+			if *v == CellType::Alive {
+				canvas.set_draw_color(Color::RGB(255, 255, 255));
+			} else {
+				canvas.set_draw_color(Color::RGB(0, 0, 0));
 			}
+
+			let rectangle = sdl2::rect::Rect::new(
+				vpx as i32 * (GAP + QUAD_SIZE) as i32 + OUTER_GAP as i32,
+				vpy as i32 * (GAP + QUAD_SIZE) as i32 + OUTER_GAP as i32,
+				QUAD_SIZE,
+				QUAD_SIZE,
+			);
+			let _ = canvas.fill_rect(rectangle);
 		}
-
-		match new_grid.grid.get(&k) {
-			Some(c) => {
-				if c.cell_type == CellType::Alive {
-					canvas.set_draw_color(Color::RGB(255, 255, 255));
-				} else {
-					canvas.set_draw_color(Color::RGB(0, 0, 0));
-				}
-			}
-			None => {}
-		}
-
-		let rectangle = sdl2::rect::Rect::new(
-			k.0 as i32 * (1 + QUAD_WIDTH as i32) + GAP as i32,
-			k.1 as i32 * (1 + QUAD_HEIGHT as i32) + GAP as i32,
-			QUAD_WIDTH,
-			QUAD_HEIGHT,
-		);
-		let _ = canvas.fill_rect(rectangle);
 	}
-
-	*grid = new_grid;
+	grid.grid = new_grid.grid;
 }
