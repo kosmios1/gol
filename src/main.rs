@@ -8,7 +8,7 @@ use std::time::Duration;
 
 const GAP: u32 = 1;
 const OUTER_GAP: u32 = 10;
-const WINDOW_WIDTH: u32 = 960;
+const WINDOW_WIDTH: u32 = 1280;
 const ASPECT_RATIO: f32 = 9.0 / 16.0;
 
 const QUAD_SIZE: u32 = 14;
@@ -98,9 +98,11 @@ fn main() {
 	let mut grid = Grid::new();
 	grid.add_penta_decathlon(10, 10);
 
+	let mut halt = true;
 	'running: loop {
 		canvas.set_draw_color(Color::RGB(150, 150, 150));
 		canvas.clear();
+
 		for event in event_pump.poll_iter() {
 			match event {
 				Event::Quit { .. }
@@ -108,6 +110,27 @@ fn main() {
 					keycode: Some(Keycode::Escape),
 					..
 				} => break 'running,
+				Event::MouseMotion {
+					mousestate,
+					x,
+					y,
+					..
+				} => {
+					if mousestate.left() {
+						let vpx = (x - OUTER_GAP as i32) / (QUAD_SIZE + GAP) as i32;
+						let vpy = (y - OUTER_GAP as i32) / (QUAD_SIZE + GAP) as i32;
+						grid.add_cell((vpx as i64, vpy as i64), CellType::Alive);
+					} else if mousestate.right() {
+						let vpx = (x - OUTER_GAP as i32) / (QUAD_SIZE + GAP) as i32;
+						let vpy = (y - OUTER_GAP as i32) / (QUAD_SIZE + GAP) as i32;
+						grid.add_cell((vpx as i64, vpy as i64), CellType::Dead);
+					}
+				}
+				Event::KeyDown { keycode, .. } => {
+					if keycode == Some(Keycode::P) {
+						halt = !halt;
+					}
+				}
 				_ => {}
 			}
 		}
@@ -115,15 +138,17 @@ fn main() {
 		let draw_surf = canvas.viewport();
 		let vpwidth = (draw_surf.width() - OUTER_GAP) / (QUAD_SIZE + GAP);
 		let vpheight = (draw_surf.height() - OUTER_GAP) / (QUAD_SIZE + GAP);
-		game_cyle(&mut grid, &mut canvas, vpwidth, vpheight, 0, 0);
+
+		game_cyle(&mut grid, &mut canvas, vpwidth, vpheight, 0, 0, halt);
 		canvas.present();
-		sleep(Duration::from_millis(30));
+
+		sleep(Duration::from_millis(50));
 	}
 }
 
 fn game_cyle(
 	grid: &mut Grid, canvas: &mut Canvas<sdl2::video::Window>, vpwidth: u32, vpheight: u32,
-	off_x: i64, off_y: i64,
+	off_x: i64, off_y: i64, halt: bool,
 ) {
 	let mut new_grid = Grid::new();
 	for vpy in 0..vpheight {
@@ -133,15 +158,17 @@ fn game_cyle(
 
 			let neigh = grid.get_neigh_count(x, y);
 			let v = grid.grid.get(&(x, y)).unwrap_or(&CellType::Dead);
-			match v {
-				CellType::Alive => {
-					if neigh == 2 || neigh == 3 {
-						new_grid.add_cell((x, y), CellType::Alive);
+			if !halt {
+				match v {
+					CellType::Alive => {
+						if neigh == 2 || neigh == 3 {
+							new_grid.add_cell((x, y), CellType::Alive);
+						}
 					}
-				}
-				CellType::Dead => {
-					if neigh == 3 {
-						new_grid.add_cell((x, y), CellType::Alive);
+					CellType::Dead => {
+						if neigh == 3 {
+							new_grid.add_cell((x, y), CellType::Alive);
+						}
 					}
 				}
 			}
@@ -160,5 +187,7 @@ fn game_cyle(
 			let _ = canvas.fill_rect(rectangle);
 		}
 	}
-	grid.grid = new_grid.grid;
+	if !halt {
+		grid.grid = new_grid.grid;
+	}
 }
